@@ -1,0 +1,94 @@
+name: Publish NuGet
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nuget-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Validate release version and publishing configuration
+        id: release
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          NUGET_USER: ${{ secrets.NUGET_USER }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$NUGET_USER" ]]; then
+            echo '::error::Configure the NUGET_USER GitHub repository secret.'
+            exit 1
+          fi
+          # Canonical SemVer release or prerelease; reject NuGet normalization ambiguities.
+          version="${RELEASE_TAG#v}"
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "::error::Expected a tag such as v0.1.0 or v0.2.0-preview.1, got $RELEASE_TAG"
+            exit 1
+          fi
+          if [[ "$version" == *-* ]]; then
+            IFS='.' read -ra identifiers <<< "${version#*-}"
+            for identifier in "${identifiers[@]}"; do
+              if [[ "$identifier" =~ ^[0-9]+$ && "$identifier" != '0' && "$identifier" == 0* ]]; then
+                echo '::error::Numeric prerelease identifiers must not have leading zeros.'
+                exit 1
+              fi
+            done
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Test release
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: dotnet test SolutionExtender.slnx -c Release -p:Version="$RELEASE_VERSION"
+
+      - name: Pack release
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: >-
+          dotnet pack src/SolutionExtender.Tool/SolutionExtender.Tool.csproj
+          -c Release --no-restore -o artifacts/packages
+          -p:Version="$RELEASE_VERSION" -p:ContinuousIntegrationBuild=true
+
+      - name: Preserve release package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: SolutionExtender-${{ steps.release.outputs.version }}
+          path: artifacts/packages/*.nupkg
+          if-no-files-found: error
+
+      # Exchange GitHub OIDC for a short-lived, package-scoped API key.
+      # No long-lived NUGET_API_KEY secret is needed.
+      - name: Authenticate to NuGet using trusted publishing
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish package
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: >-
+          dotnet nuget push "artifacts/packages/SolutionExtender.$RELEASE_VERSION.nupkg"
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json

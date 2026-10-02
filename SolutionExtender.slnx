@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SolutionExtender.Core/SolutionExtender.Core.csproj" />
+    <Project Path="src/SolutionExtender.Tool/SolutionExtender.Tool.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SolutionExtender.Tests/SolutionExtender.Tests.csproj" />
+  </Folder>
+</Solution>
