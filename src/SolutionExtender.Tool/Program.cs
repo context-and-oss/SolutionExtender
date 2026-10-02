@@ -137,7 +137,7 @@ namespace SolutionExtender.Tool
         }
 
         private const string Help = """
-        SolutionExtender — Daxif extended solution handling for PAC / .NET 10
+        SolutionExtender — extended solution deployment for PAC / .NET 10
 
         Offline commands (no authentication):
           inspect --input <zip|ExtendedSolution.xml|folder>

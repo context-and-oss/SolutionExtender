@@ -5,6 +5,6 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.1"><PrivateAssets>all</PrivateAssets></PackageReference>
     <ProjectReference Include="../../src/SolutionExtender.Tool/SolutionExtender.Tool.csproj" />
-    <None Include="../../magnus.zip" Link="magnus.zip" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures/ExtendedSolution.xml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

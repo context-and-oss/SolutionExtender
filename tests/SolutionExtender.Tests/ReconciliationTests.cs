@@ -7,7 +7,7 @@ public sealed class ReconciliationTests
 {
     private static Component C(string name) => new(Guid.NewGuid(), name);
     [Fact]
-    public void UsesDaxifIdentityRulesAndChildFirstOrder()
+    public void UsesComponentIdentityRulesAndChildFirstOrder()
     {
         var source = new ExtendedManifest { Assemblies = [C("assembly")], PluginTypes = [C("type")], PluginSteps = [C("step")],
             PluginImages = [C("image")], CustomApis = [C("api")] };
@@ -32,7 +32,7 @@ public sealed class ReconciliationTests
     [Fact]
     public void IdenticalSnapshotsProduceNoActions()
     {
-        var m = SolutionPackage.Read(Path.Combine(AppContext.BaseDirectory, "magnus.zip"));
+        var m = NativeFixture.Manifest();
         Assert.Empty(Reconciliation.Compare(m, m, "pre-import").Actions);
         Assert.Empty(Reconciliation.Compare(m, m, "post-import").Actions);
     }

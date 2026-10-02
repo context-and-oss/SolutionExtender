@@ -69,7 +69,7 @@ public sealed class DataverseDeployment(IOrganizationService service)
             assignments.Add(new("assign", "workflow", workflow.Id, workflow.Name, OwnerId: users[0].Id));
             assignments.Add(new("set-state", "workflow", workflow.Id, workflow.Name, desired.StateCode, desired.StatusCode));
         }
-        // Daxif performs workflow reassignment before restoring states.
+        // Reassign workflows before restoring their final states.
         var firstState = actions.FindIndex(a => a.Kind == "set-state" && source.States.Any(s => s.Id == a.Id));
         actions.InsertRange(firstState < 0 ? actions.Count : firstState, assignments);
         return new(phase, actions);
@@ -130,7 +130,7 @@ public sealed class DataverseDeployment(IOrganizationService service)
     private string Owner(Entity workflow)
     {
         var owner = workflow.GetAttributeValue<EntityReference>("ownerid") ?? throw new InvalidDataException("Workflow has no owner.");
-        if (owner.LogicalName != "systemuser") throw new InvalidDataException("Team-owned workflows cannot be represented by Daxif's domain-name owner format.");
+        if (owner.LogicalName != "systemuser") throw new InvalidDataException("Team-owned workflows cannot be represented by the manifest's domain-name owner format.");
         return service.Retrieve("systemuser", owner.Id, new ColumnSet("domainname")).GetAttributeValue<string>("domainname")
             ?? throw new InvalidDataException("Workflow owner has no domainname.");
     }

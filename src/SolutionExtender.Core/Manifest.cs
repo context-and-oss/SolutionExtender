@@ -15,7 +15,7 @@ public sealed class ExtendedManifest
     public List<Component> PluginImages { get; init; } = [];
     public List<Component> Workflows { get; init; } = [];
     public List<Component> WebResources { get; init; } = [];
-    // null means an older Daxif manifest: not an instruction to delete every custom API.
+    // null means API reconciliation was not captured; it must not imply deletion of every API.
     public List<Component>? CustomApis { get; init; }
     public List<EntityState> States { get; init; } = [];
 
@@ -35,19 +35,12 @@ public sealed class ExtendedManifest
     }
 }
 
-/// <summary>Reads/writes Daxif's F# DataContract XML without depending on FSharp.Core or Daxif.</summary>
+/// <summary>Reads and writes SolutionExtender's versioned XML contract.</summary>
 public static class ManifestXml
 {
-    private static readonly XNamespace Domain = "http://schemas.datacontract.org/2004/07/DG.Daxif.Modules.Solution";
-    private static readonly XNamespace SystemNs = "http://schemas.datacontract.org/2004/07/System";
-    private static readonly XNamespace FSharp = "http://schemas.datacontract.org/2004/07/Microsoft.FSharp.Collections";
-    private static readonly XNamespace Generic = "http://schemas.datacontract.org/2004/07/System.Collections.Generic";
-    private static string Name(XElement e) => XmlConvert.DecodeName(e.Name.LocalName).TrimEnd('@');
-    private static XElement? Child(XElement e, string name) => e.Elements().SingleOrDefault(x => Name(x) == name);
-    private static string Text(XElement e, string name) => Child(e, name)?.Value
-        ?? throw new InvalidDataException($"Missing '{name}' in extended manifest.");
-    private static Guid Id(string value) => Guid.TryParse(value, out var id) && id != Guid.Empty ? id
-        : throw new InvalidDataException($"Invalid GUID '{value}' in extended manifest.");
+    public const string NamespaceUri = "urn:solutionextender:manifest";
+    public const int CurrentVersion = 1;
+    private static readonly XNamespace Ns = NamespaceUri;
 
     public static XDocument Load(Stream stream)
     {
@@ -60,33 +53,34 @@ public static class ManifestXml
     public static ExtendedManifest Read(XDocument document)
     {
         var root = document.Root ?? throw new InvalidDataException("Empty extended manifest.");
-        if (root.Name != Domain + "Domain.ExtendedSolution")
-            throw new InvalidDataException("Not a Daxif ExtendedSolution.xml document.");
-        var allowed = new HashSet<string> { "keepAssemblies", "keepPluginTypes", "keepPluginSteps", "keepPluginImages", "keepWorkflows", "keepWebresources", "keepCustomAPIs", "states" };
-        if (root.Elements().Any(e => !allowed.Contains(Name(e))))
-            throw new InvalidDataException("Unsupported extended manifest field; refusing to silently discard metadata.");
+        if (root.Name != Ns + "ExtendedSolution") throw new InvalidDataException("Not a SolutionExtender manifest.");
+        Shape(root, ["Assemblies", "PluginTypes", "PluginSteps", "PluginImages", "Workflows", "WebResources", "CustomApis", "States"], ["version"]);
+        if (Attribute(root, "version") != CurrentVersion.ToString(CultureInfo.InvariantCulture))
+            throw new InvalidDataException($"Unsupported extended manifest version '{Attribute(root, "version")}'.");
+
         List<Component> Components(string name, bool owners = false)
         {
-            var field = Child(root, name) ?? throw new InvalidDataException($"Missing '{name}' in extended manifest.");
-            return field.Elements().Select(e => new Component(Id(Text(e, "m_Item1")), Text(e, "m_Item2"),
-                owners ? Text(e, "m_Item3") : null)).ToList();
+            var field = Child(root, name);
+            Shape(field, ["Component"], []);
+            return field.Elements().Select(e =>
+            {
+                Shape(e, [], owners ? ["id", "name", "owner"] : ["id", "name"]);
+                return new Component(Id(Attribute(e, "id")), Attribute(e, "name"), owners ? e.Attribute("owner")?.Value : null);
+            }).ToList();
         }
-        var states = Child(root, "states") ?? throw new InvalidDataException("Missing states in extended manifest.");
-        var data = Child(states, "serializedData") ?? throw new InvalidDataException("Missing states serializedData.");
+        var states = Child(root, "States");
+        Shape(states, ["State"], []);
         var manifest = new ExtendedManifest
         {
-            Assemblies = Components("keepAssemblies"), PluginTypes = Components("keepPluginTypes"),
-            PluginSteps = Components("keepPluginSteps"), PluginImages = Components("keepPluginImages"),
-            WebResources = Components("keepWebresources"), Workflows = Components("keepWorkflows", true),
-            CustomApis = Child(root, "keepCustomAPIs") is null ? null : Components("keepCustomAPIs"),
-            States = data.Elements().Select(e =>
+            Assemblies = Components("Assemblies"), PluginTypes = Components("PluginTypes"),
+            PluginSteps = Components("PluginSteps"), PluginImages = Components("PluginImages"),
+            WebResources = Components("WebResources"), Workflows = Components("Workflows", true),
+            CustomApis = root.Element(Ns + "CustomApis") is null ? null : Components("CustomApis"),
+            States = states.Elements().Select(e =>
             {
-                var v = Child(e, "value") ?? throw new InvalidDataException("Missing state value.");
-                var id = Id(Text(v, "id"));
-                if (Id(Text(e, "key")) != id) throw new InvalidDataException("State map key differs from entity ID.");
-                return new EntityState(id, Text(v, "logicalName"),
-                    int.Parse(Text(v, "stateCode"), CultureInfo.InvariantCulture),
-                    int.Parse(Text(v, "statusCode"), CultureInfo.InvariantCulture));
+                Shape(e, [], ["id", "logicalName", "stateCode", "statusCode"]);
+                return new EntityState(Id(Attribute(e, "id")), Attribute(e, "logicalName"),
+                    Number(Attribute(e, "stateCode")), Number(Attribute(e, "statusCode")));
             }).ToList()
         };
         manifest.Validate();
@@ -97,27 +91,40 @@ public static class ManifestXml
     {
         manifest.Validate();
         XElement Field(string name, IEnumerable<Component> components, bool owners = false) =>
-            new(Domain + name + "_x0040_", new XAttribute(XNamespace.Xmlns + "a", SystemNs),
-                components.OrderBy(c => c.Id).Select(c => new XElement(SystemNs + (owners ? "TupleOfguidstringstring" : "TupleOfguidstring"),
-                    new XElement(SystemNs + "m_Item1", c.Id), new XElement(SystemNs + "m_Item2", c.Name),
-                    owners ? new XElement(SystemNs + "m_Item3", c.Owner ?? "") : null)));
-        var root = new XElement(Domain + "Domain.ExtendedSolution",
-            new XAttribute("xmlns", Domain.NamespaceName),
-            new XAttribute(XNamespace.Xmlns + "i", "http://www.w3.org/2001/XMLSchema-instance"),
-            Field("keepAssemblies", manifest.Assemblies));
-        if (manifest.CustomApis is not null) root.Add(Field("keepCustomAPIs", manifest.CustomApis));
-        root.Add(Field("keepPluginImages", manifest.PluginImages), Field("keepPluginSteps", manifest.PluginSteps),
-            Field("keepPluginTypes", manifest.PluginTypes), Field("keepWebresources", manifest.WebResources),
-            Field("keepWorkflows", manifest.Workflows, true),
-            new XElement(Domain + "states_x0040_", new XAttribute(XNamespace.Xmlns + "a", FSharp),
-                new XElement(FSharp + "serializedData", new XAttribute(XNamespace.Xmlns + "b", Generic),
-                    manifest.States.OrderBy(s => s.Id).Select(s => new XElement(Generic + "KeyValuePairOfstringDomain.EntityState97c0x1za",
-                        new XElement(Generic + "key", s.Id), new XElement(Generic + "value",
-                            new XElement(Domain + "id_x0040_", s.Id), new XElement(Domain + "logicalName_x0040_", s.LogicalName),
-                            new XElement(Domain + "stateCode_x0040_", s.StateCode), new XElement(Domain + "statusCode_x0040_", s.StatusCode)))))));
+            new(Ns + name, components.OrderBy(c => c.Id).Select(c => new XElement(Ns + "Component",
+                new XAttribute("id", c.Id), new XAttribute("name", c.Name),
+                owners && c.Owner is not null ? new XAttribute("owner", c.Owner) : null)));
+        var root = new XElement(Ns + "ExtendedSolution", new XAttribute("xmlns", NamespaceUri),
+            new XAttribute("version", CurrentVersion),
+            Field("Assemblies", manifest.Assemblies), Field("PluginTypes", manifest.PluginTypes),
+            Field("PluginSteps", manifest.PluginSteps), Field("PluginImages", manifest.PluginImages),
+            Field("Workflows", manifest.Workflows, true), Field("WebResources", manifest.WebResources));
+        if (manifest.CustomApis is not null) root.Add(Field("CustomApis", manifest.CustomApis));
+        root.Add(new XElement(Ns + "States", manifest.States.OrderBy(s => s.Id).Select(s => new XElement(Ns + "State",
+            new XAttribute("id", s.Id), new XAttribute("logicalName", s.LogicalName),
+            new XAttribute("stateCode", s.StateCode), new XAttribute("statusCode", s.StatusCode)))));
         using var stream = new MemoryStream();
         using (var writer = XmlWriter.Create(stream, new XmlWriterSettings { Encoding = new System.Text.UTF8Encoding(false), Indent = true, OmitXmlDeclaration = true }))
             root.Save(writer);
         return stream.ToArray();
+    }
+
+    private static XElement Child(XElement e, string name)
+    {
+        var children = e.Elements(Ns + name).ToArray();
+        return children.Length == 1 ? children[0] : throw new InvalidDataException($"Expected exactly one '{name}' field.");
+    }
+    private static string Attribute(XElement e, string name) => e.Attribute(name)?.Value
+        ?? throw new InvalidDataException($"Missing '{name}' on '{e.Name.LocalName}'.");
+    private static Guid Id(string value) => Guid.TryParse(value, out var id) && id != Guid.Empty ? id
+        : throw new InvalidDataException($"Invalid GUID '{value}' in extended manifest.");
+    private static int Number(string value) => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) ? number
+        : throw new InvalidDataException($"Invalid state/status code '{value}' in extended manifest.");
+    private static void Shape(XElement element, string[] children, string[] attributes)
+    {
+        if (element.Elements().Any(e => e.Name.Namespace != Ns || !children.Contains(e.Name.LocalName)) ||
+            element.Attributes().Any(a => !a.IsNamespaceDeclaration && (a.Name.Namespace != XNamespace.None || !attributes.Contains(a.Name.LocalName))) ||
+            element.Nodes().OfType<XText>().Any(t => !string.IsNullOrWhiteSpace(t.Value)))
+            throw new InvalidDataException($"Unsupported content in '{element.Name.LocalName}'; refusing to discard metadata.");
     }
 }

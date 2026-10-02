@@ -77,11 +77,12 @@ public sealed class DeploymentTests
         Assert.Equal(new[] { (1, (string?)null), (2, (string?)"next-page") }, pages);
     }
     [Fact]
-    public void CaptureIncludesViewStatesFromTheRealPackage()
+    public void CaptureIncludesViewStatesFromFreshExport()
     {
         var fake = new FakeService { RetrieveHandler = (table, id) => new Entity(table, id)
             { ["statecode"] = new OptionSetValue(0), ["statuscode"] = new OptionSetValue(1) } };
-        var snapshot = new DataverseDeployment(fake).Capture(Path.Combine(AppContext.BaseDirectory, "magnus.zip"), Guid.NewGuid());
+        using var temp = new TemporaryDirectory();
+        var snapshot = new DataverseDeployment(fake).Capture(NativeFixture.CreatePackage(temp.Path), Guid.NewGuid());
         Assert.Equal(7, snapshot.States.Count);
         Assert.All(snapshot.States, s => Assert.Equal("savedquery", s.LogicalName));
     }

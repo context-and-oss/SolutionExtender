@@ -19,7 +19,7 @@ Once published to your NuGet feed, use `dnx SolutionExtender@<version> -- <argum
 For development without packing:
 
 ```bash
-dotnet run --project src/SolutionExtender.Tool -- inspect --input magnus.zip
+dotnet run --project src/SolutionExtender.Tool -- inspect --input ./out/Magnus_extended.zip
 ```
 
 ## Connection selection
@@ -47,9 +47,7 @@ DataverseConnection's built-in credential options and persistent token caching a
 
 ## 1. Export and capture extended metadata
 
-If the ZIP was already exported by Daxif with `extended = true` (like `magnus.zip`), skip `extend`.
-
-For a normal PAC export, capture state, owners, and keep-lists from the **source** environment immediately after exporting. Avoid modifying that environment between export and capture.
+Start with a fresh PAC export, then capture state, owners, and keep-lists from the **source** environment immediately after exporting. Avoid modifying that environment between export and capture.
 
 ```bash
 pac solution export --name Magnus --path ./out/Magnus.zip --managed false
@@ -60,6 +58,31 @@ dnx SolutionExtender@0.1.0 --source ./artifacts/packages -- extend \
 ```
 
 The unique solution name is read from `solution.xml`. `extend` requires the source solution to exist, writes a separate output by default, and never modifies Dataverse. A plain ZIP cannot reliably supply live states and workflow owners; the capture step therefore needs a connection.
+
+### Native manifest format
+
+New captures write `ExtendedSolution.xml` using namespace **`urn:solutionextender:manifest`**, with an explicit **`version="1"`**. The contract is independent of Daxif and F# runtime serialization. Components use named attributes instead of tuples; states are a flat list rather than a serialized F# map.
+
+```xml
+<ExtendedSolution xmlns="urn:solutionextender:manifest" version="1">
+  <Assemblies>
+    <Component id="441b30a5-16bd-f111-aaad-000d3a31e0c8" name="Example.Plugins" />
+  </Assemblies>
+  <PluginTypes />
+  <PluginSteps />
+  <PluginImages />
+  <Workflows />
+  <WebResources />
+  <CustomApis />
+  <States>
+    <State id="0cc1ad40-0636-5253-a9f5-c0bbca66f29b" logicalName="savedquery" stateCode="0" statusCode="1" />
+  </States>
+</ExtendedSolution>
+```
+
+Workflow components optionally include `owner="user@example.org"`. Every section except `CustomApis` is required, even when empty. Unsupported versions, unknown elements/attributes, and missing or duplicate sections are rejected before reconciliation. Output is deterministic for source-control diffs.
+
+**Only SolutionExtender manifests are supported.** There is no legacy reader, writer, or migration path. Start with a fresh PAC export and run `extend`; use the resulting ZIP with SolutionExtender’s pre-/post-import commands.
 
 ## 2. Preserve metadata alongside PAC unpacked files
 
@@ -136,7 +159,7 @@ Deletion order is custom APIs → images → steps → types → assemblies. Ste
 - There is no transaction across pre-import, PAC import, and post-import. Operations run sequentially and fail fast; prior successful operations are not rolled back.
 - A missing target solution is a successful pre-import no-op. Post-import requires it to exist. Authentication/query failures are not interpreted as "solution missing."
 - Missing state records, missing/ambiguous enabled workflow-owner users, and team-owned source workflows fail explicitly before planned changes. Team ownership cannot be represented in Daxif's domain-name format.
-- Older Daxif manifests without `keepCustomAPIs` are supported; absence means **do not reconcile APIs**, while an explicitly empty list means delete all in-scope APIs.
+- An omitted `CustomApis` section means **do not reconcile APIs**, while an explicitly empty section means delete all in-scope APIs. Fresh captures include this section.
 - Unknown manifest fields, duplicate IDs, duplicate root manifests, invalid IDs, state-map key mismatches, and DTD/entity expansion are rejected rather than silently losing metadata.
 - No generic entity/attribute deletion, schema synchronization, workflow impersonation, or connection-secret command-line options are included.
 - No HTTP server is included: the offline service is the reusable `SolutionExtender.Core` class library, and the connected orchestration is `DataverseDeployment(IOrganizationService)`.
@@ -144,7 +167,7 @@ Deletion order is custom APIs → images → steps → types → assemblies. Ste
 ## Offline inspection and planning
 
 ```bash
-dnx SolutionExtender@0.1.0 --source ./artifacts/packages -- inspect --input magnus.zip
+dnx SolutionExtender@0.1.0 --source ./artifacts/packages -- inspect --input ./out/Magnus_extended.zip
 
 dnx SolutionExtender@0.1.0 --source ./artifacts/packages -- plan \
   --source ./release.zip --target ./target_extended.zip --phase pre-import
@@ -160,9 +183,9 @@ dotnet test
 dotnet pack src/SolutionExtender.Tool -c Release -o artifacts/packages
 ```
 
-Tests exercise the provided `magnus.zip`, XML round-trips, PAC sidecar attachment and payload preservation, legacy manifests, invalid inputs, Daxif matching/deletion order, state restoration, scoped queries, reassignment, and fail-fast execution through a fake organization service. Live Dataverse authentication/import testing requires an environment and is not performed by the unit suite.
+Tests use a native XML fixture and generated fresh PAC-style ZIPs to exercise XML round-trips, export → attach → extract → reattach workflows, payload preservation, unsupported-format rejection, component matching/deletion order, state restoration, scoped queries, reassignment, and fail-fast execution through a fake organization service. Live Dataverse authentication/import testing requires an environment and is not performed by the unit suite.
 
-Reference implementations: `context-and-oss/Daxif` (`Modules/Solution/Extend.fs`, `Domain.fs`) and `delegateas/DataverseConnection`. The XML contract is implemented independently using .NET XML APIs.
+Reference implementations: `context-and-oss/Daxif` (`Modules/Solution/Extend.fs`, `Domain.fs`) and `delegateas/DataverseConnection`. Deployment semantics are based on Daxif; the new manifest contract is owned and versioned by SolutionExtender.
 
 
 ## NuGet deployment with trusted publishing

@@ -7,7 +7,7 @@
     <PackageId>SolutionExtender</PackageId>
     <Version>0.1.0</Version>
     <Authors>SolutionExtender contributors</Authors>
-    <Description>Preserve Daxif extended solutions across PAC unpack/pack and reconcile unmanaged Dataverse deployments.</Description>
+    <Description>Capture versioned deployment metadata for PAC solutions and reconcile unmanaged Dataverse deployments.</Description>
     <RepositoryUrl>https://github.com/context-and-oss/SolutionExtender</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>

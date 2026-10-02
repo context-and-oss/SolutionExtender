@@ -1,0 +1,37 @@
+<ExtendedSolution xmlns="urn:solutionextender:manifest" version="1">
+  <Assemblies>
+    <Component id="00002851-1111-4222-8333-444444444444" name="ctx_Assemblies_1" />
+  </Assemblies>
+  <PluginTypes>
+    <Component id="00002d29-1111-4222-8333-444444444444" name="ctx_PluginTypes_1" />
+    <Component id="00002d2a-1111-4222-8333-444444444444" name="ctx_PluginTypes_2" />
+    <Component id="00002d2b-1111-4222-8333-444444444444" name="ctx_PluginTypes_3" />
+  </PluginTypes>
+  <PluginSteps>
+    <Component id="00002ced-1111-4222-8333-444444444444" name="ctx_PluginSteps_1" />
+    <Component id="00002cee-1111-4222-8333-444444444444" name="ctx_PluginSteps_2" />
+  </PluginSteps>
+  <PluginImages />
+  <Workflows />
+  <WebResources>
+    <Component id="0000307b-1111-4222-8333-444444444444" name="ctx_WebResources_1" />
+    <Component id="0000307c-1111-4222-8333-444444444444" name="ctx_WebResources_2" />
+    <Component id="0000307d-1111-4222-8333-444444444444" name="ctx_WebResources_3" />
+    <Component id="0000307e-1111-4222-8333-444444444444" name="ctx_WebResources_4" />
+    <Component id="0000307f-1111-4222-8333-444444444444" name="ctx_WebResources_5" />
+    <Component id="00003080-1111-4222-8333-444444444444" name="ctx_WebResources_6" />
+    <Component id="00003081-1111-4222-8333-444444444444" name="ctx_WebResources_7" />
+  </WebResources>
+  <CustomApis>
+    <Component id="00002851-1111-4222-8333-444444444444" name="ctx_CustomApis_1" />
+  </CustomApis>
+  <States>
+    <State id="00000001-aaaa-4bbb-8ccc-dddddddddddd" logicalName="savedquery" stateCode="0" statusCode="1" />
+    <State id="00000002-aaaa-4bbb-8ccc-dddddddddddd" logicalName="savedquery" stateCode="0" statusCode="1" />
+    <State id="00000003-aaaa-4bbb-8ccc-dddddddddddd" logicalName="savedquery" stateCode="0" statusCode="1" />
+    <State id="00000004-aaaa-4bbb-8ccc-dddddddddddd" logicalName="savedquery" stateCode="0" statusCode="1" />
+    <State id="00000005-aaaa-4bbb-8ccc-dddddddddddd" logicalName="savedquery" stateCode="0" statusCode="1" />
+    <State id="00000006-aaaa-4bbb-8ccc-dddddddddddd" logicalName="savedquery" stateCode="0" statusCode="1" />
+    <State id="00000007-aaaa-4bbb-8ccc-dddddddddddd" logicalName="savedquery" stateCode="0" statusCode="1" />
+  </States>
+</ExtendedSolution>
