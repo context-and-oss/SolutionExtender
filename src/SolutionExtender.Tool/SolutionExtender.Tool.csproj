@@ -14,6 +14,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="SolutionExtender.Tests" />
     <ProjectReference Include="../SolutionExtender.Core/SolutionExtender.Core.csproj" />
     <PackageReference Include="DataverseConnection" Version="1.2.5" />
     <None Include="../../README.md" Pack="true" PackagePath="/" />

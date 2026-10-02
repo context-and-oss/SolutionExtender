@@ -40,10 +40,11 @@ dnx SolutionExtender@0.1.0 --source ./artifacts/packages -- pre-import \
 | `--auth azcli` | Reuse an authenticated Azure CLI session (`az login`). |
 | `--auth devicecode` | Authenticate using a device code. |
 | `--auth interactive` | Interactive browser authentication; default. `browser` is an alias. |
-| `--tenant-id <tenant>` | Optional tenant override for any method. |
-| `--client-id <app-id>` | Optional application registration for device-code/browser authentication. Not valid with `azcli`. |
+| `--tenant-id <tenant>` | Optional tenant override for `azcli` only. |
 
-DataverseConnection's built-in credential options and persistent token caching are used by default. Explicit browser/device-code tenant/client overrides create Azure Identity options with persistent caching enabled; these use Azure Identity's encrypted storage requirements. Protect authentication caches. `azcli` depends on the Azure CLI's own token cache.
+Browser and device-code authentication are managed by DataverseConnection, including the environment-specific persistent token cache, saved authentication record, and persistence fallback. DataverseConnection permits an unencrypted token-cache fallback on Linux when the keychain is unavailable; protect the cache as a secret. `azcli` depends on the Azure CLI's own token cache.
+
+`--client-id` is not supported. `--tenant-id` is supported only with `--auth azcli`; browser and device-code authentication use DataverseConnection's built-in credential configuration.
 
 ## 1. Export and capture extended metadata
 
@@ -218,3 +219,12 @@ The workflow uploads the built package as an artifact before authentication/publ
 ## Live read-only verification
 
 On October 2, 2026, device-code authentication through DataverseConnection was tested against `abs-preview.crm.dynamics.com`. The live solution was verified as **Magnus**, unmanaged, publisher **ContextAnd**, prefix **ctx**, version **1.0.0.1**. Metadata capture and both deployment planning phases were exercised without `--apply`. Local captures and plans are under ignored `artifacts/live-test/`, not committed. No live import, deletion, state update, or workflow reassignment was performed.
+
+
+## Static analysis
+
+All projects use the pinned AsyncFixer, Asyncify, Meziantou.Analyzer, SecurityCodeScan.VS2019, StyleCop.Analyzers, and SonarAnalyzer.CSharp packages from `Directory.Build.props`, with `PrivateAssets="All"`. Analyzer warnings fail the build through `TreatWarningsAsErrors`; the analyzer packages are not runtime dependencies of the published tool.
+
+Public production APIs have XML documentation, and types reside in matching files. `stylecop.json` keeps using directives outside file-scoped namespaces. `.editorconfig` disables mandatory copyright file headers, omits mandatory `this.` qualification for unambiguous member access, and exempts test methods/SDK test doubles from API documentation requirements. All other analyzer defaults remain enabled.
+
+Run `dotnet build -c Release` and `dotnet test -c Release` to verify the same checks locally as in CI.

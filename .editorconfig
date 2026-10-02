@@ -1,0 +1,16 @@
+root = true
+
+[*.cs]
+# File copyright headers are not required.
+dotnet_diagnostic.SA1633.severity = none
+# Match the project's file-scoped namespaces and modern C# conventions.
+csharp_using_directive_placement = outside_namespace
+# Qualification is unnecessary for unambiguous member access.
+dotnet_diagnostic.SA1101.severity = none
+csharp_preserve_single_line_blocks = false
+csharp_preserve_single_line_statements = false
+
+[tests/**/*.cs]
+# Tests and the SDK test double are not a documented public API.
+dotnet_diagnostic.CS1591.severity = none
+dotnet_diagnostic.SA1600.severity = none
